@@ -147,11 +147,6 @@
         destino: document.getElementById('destino').value.trim()
       };
 
-      if (Object.values(novo).some(v => !v)) {
-        alert("Preencha todos os campos antes de salvar.");
-        return;
-      }
-
       registros.push(novo);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(registros));
       limparCampos(false);
