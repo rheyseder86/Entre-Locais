@@ -78,10 +78,10 @@
               <input type="checkbox" id="selecionarTodos" onclick="toggleSelecionarTodos(this)" />
             </th>
             <th>#</th>
-            <th>Cavalo</th>
+            <th>Data</th> <th>Cavalo</th>
             <th>Carreta 01</th>
             <th>Carreta 02</th>
-            <th>Data/H. Chegada</th>
+            <th>H. Chegada</th>
             <th>H. Saída</th>
             <th>Mot. Chegada</th>
             <th>Mot. Saída</th>
@@ -129,15 +129,13 @@
     let registros = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
     let registroSelecionadoIndex = null; // Armazena apenas o índice para edição
 
-    function formatarDataHoraParaExibicao(timestamp) {
-      if (!timestamp) return ''; // Retorna vazio se não houver timestamp
+    function formatarDataParaExibicao(timestamp) {
+      if (!timestamp) return '';
       const date = new Date(timestamp);
       const dia = String(date.getDate()).padStart(2, '0');
       const mes = String(date.getMonth() + 1).padStart(2, '0');
       const ano = date.getFullYear();
-      const hora = String(date.getHours()).padStart(2, '0');
-      const minuto = String(date.getMinutes()).padStart(2, '0');
-      return `${dia}/${mes}/${ano} ${hora}:${minuto}`;
+      return `${dia}/${mes}/${ano}`;
     }
 
     function atualizarTerminal() {
@@ -156,8 +154,9 @@
         )
         .map((r, i) => {
           // Precisamos encontrar o índice original para o checkbox e seleção
-          const originalIndex = registros.findIndex(reg => reg.timestamp === r.timestamp && reg.cavalo === r.cavalo); // Mais robusto para encontrar o original
-          const dataHoraChegadaExibicao = formatarDataHoraParaExibicao(r.timestamp);
+          // Uma combinação de timestamp e cavalo para maior robustez na identificação
+          const originalIndex = registros.findIndex(reg => reg.timestamp === r.timestamp && reg.cavalo === r.cavalo);
+          const dataChegadaExibicao = formatarDataParaExibicao(r.timestamp);
 
           return `
             <tr class="${registroSelecionadoIndex === originalIndex ? 'linha-selecionada' : ''}">
@@ -165,11 +164,10 @@
                 <input type="checkbox" class="selecao-item" data-index="${originalIndex}" />
               </td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${i + 1}</td>
-              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.cavalo}</td>
+              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${dataChegadaExibicao}</td> <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.cavalo}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.carreta1}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.carreta2}</td>
-              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${dataHoraChegadaExibicao}</td>
-              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.hSaida}</td>
+              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.hChegada}</td> <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.hSaida}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.motChegada}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.motSaida}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.origem}</td>
@@ -198,7 +196,7 @@
       document.getElementById('carreta1').value = r.carreta1;
       document.getElementById('carreta2').value = r.carreta2;
       
-      // A hora de chegada é preenchida, mas a data será a do momento da edição/salvamento
+      // Apenas a hora de chegada é preenchida no input
       document.getElementById('hChegada').value = r.hChegada; 
       document.getElementById('hSaida').value = r.hSaida;
       document.getElementById('motChegada').value = r.motChegada;
@@ -227,7 +225,7 @@
         carreta1: document.getElementById('carreta1').value.trim(),
         carreta2: document.getElementById('carreta2').value.trim(),
         timestamp: now.getTime(), // Adiciona o timestamp da data e hora atual + hora informada
-        hChegada: hChegada, // Mantém a hora de chegada separada para edição
+        hChegada: hChegada, // Mantém a hora de chegada separada
         hSaida: document.getElementById('hSaida').value,
         motChegada: document.getElementById('motChegada').value.trim(),
         motSaida: document.getElementById('motSaida').value.trim(),
@@ -264,7 +262,7 @@
         carreta1: document.getElementById('carreta1').value.trim(),
         carreta2: document.getElementById('carreta2').value.trim(),
         timestamp: now.getTime(), // Atualiza o timestamp
-        hChegada: hChegada, // Mantém a hora de chegada separada para edição
+        hChegada: hChegada, // Mantém a hora de chegada separada
         hSaida: document.getElementById('hSaida').value,
         motChegada: document.getElementById('motChegada').value.trim(),
         motSaida: document.getElementById('motSaida').value.trim(),
@@ -319,8 +317,8 @@
 
     function emitirTXT() {
       const texto = registros.map((r, i) => {
-        const dataHoraChegadaExibicao = formatarDataHoraParaExibicao(r.timestamp);
-        return `#${i + 1} ${r.cavalo} ${r.carreta1} ${r.carreta2} ${dataHoraChegadaExibicao} ${r.hSaida} ${r.motChegada} ${r.motSaida} ${r.origem} ${r.destino}`;
+        const dataChegadaExibicao = formatarDataParaExibicao(r.timestamp);
+        return `#${i + 1} ${dataChegadaExibicao} ${r.cavalo} ${r.carreta1} ${r.carreta2} ${r.hChegada} ${r.hSaida} ${r.motChegada} ${r.motSaida} ${r.origem} ${r.destino}`;
       }).join('\n');
 
       const blob = new Blob([texto], { type: 'text/plain' });
@@ -334,17 +332,18 @@
 
     function emitirExcel() {
       const headers = [
-        "Cavalo", "Carreta 01", "Carreta 02", "Data/Hora Chegada", 
+        "Data Chegada", "Cavalo", "Carreta 01", "Carreta 02", "Hora Chegada", 
         "Hora Saída", "Mot. Chegada", "Mot. Saída", "Origem", "Destino"
       ];
       
       const dadosParaExcel = registros.map(r => {
-        const dataHoraChegadaExibicao = formatarDataHoraParaExibicao(r.timestamp);
+        const dataChegadaExibicao = formatarDataParaExibicao(r.timestamp);
         return {
+          "Data Chegada": dataChegadaExibicao,
           "Cavalo": r.cavalo,
           "Carreta 01": r.carreta1,
           "Carreta 02": r.carreta2,
-          "Data/Hora Chegada": dataHoraChegadaExibicao,
+          "Hora Chegada": r.hChegada,
           "Hora Saída": r.hSaida,
           "Mot. Chegada": r.motChegada,
           "Mot. Saída": r.motSaida,
