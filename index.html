@@ -78,7 +78,8 @@
               <input type="checkbox" id="selecionarTodos" onclick="toggleSelecionarTodos(this)" />
             </th>
             <th>#</th>
-            <th>Data</th> <th>Cavalo</th>
+            <th>Data</th>
+            <th>Cavalo</th>
             <th>Carreta 01</th>
             <th>Carreta 02</th>
             <th>H. Chegada</th>
@@ -138,12 +139,23 @@
       return `${dia}/${mes}/${ano}`;
     }
 
+    // Função auxiliar para criar um timestamp a partir de uma hora e a data de hoje
+    function criarTimestampHojeComHora(horaString) {
+      if (!horaString) return null; // Retorna null se a string da hora for vazia
+      const now = new Date();
+      const [hours, minutes] = horaString.split(':').map(Number);
+      // Validar se hours e minutes são números válidos (para evitar NaN)
+      if (isNaN(hours) || isNaN(minutes)) return null; 
+      now.setHours(hours, minutes, 0, 0); // Define a hora e minuto, zera segundos e milissegundos
+      return now.getTime();
+    }
+
     function atualizarTerminal() {
       const filtro = document.getElementById('pesquisa').value.toLowerCase();
       const corpo = document.getElementById('corpo-registros');
 
-      // Ordena os registros por timestamp (do mais novo para o mais antigo)
-      const registrosOrdenados = [...registros].sort((a, b) => b.timestamp - a.timestamp);
+      // Ordena os registros com base no 'ordemTimestamp' (crescente para sentido horário)
+      const registrosOrdenados = [...registros].sort((a, b) => a.ordemTimestamp - b.ordemTimestamp);
 
       corpo.innerHTML = registrosOrdenados
         .filter(r =>
@@ -154,9 +166,9 @@
         )
         .map((r, i) => {
           // Precisamos encontrar o índice original para o checkbox e seleção
-          // Uma combinação de timestamp e cavalo para maior robustez na identificação
+          // Uma combinação de timestamp (momento da criação) e cavalo para maior robustez
           const originalIndex = registros.findIndex(reg => reg.timestamp === r.timestamp && reg.cavalo === r.cavalo);
-          const dataChegadaExibicao = formatarDataParaExibicao(r.timestamp);
+          const dataChegadaExibicao = formatarDataParaExibicao(r.timestamp); // Usa o timestamp original para a data
 
           return `
             <tr class="${registroSelecionadoIndex === originalIndex ? 'linha-selecionada' : ''}">
@@ -164,10 +176,12 @@
                 <input type="checkbox" class="selecao-item" data-index="${originalIndex}" />
               </td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${i + 1}</td>
-              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${dataChegadaExibicao}</td> <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.cavalo}</td>
+              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${dataChegadaExibicao}</td>
+              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.cavalo}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.carreta1}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.carreta2}</td>
-              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.hChegada}</td> <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.hSaida}</td>
+              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.hChegada}</td>
+              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.hSaida}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.motChegada}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.motSaida}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.origem}</td>
@@ -195,8 +209,6 @@
       document.getElementById('cavalo').value = r.cavalo;
       document.getElementById('carreta1').value = r.carreta1;
       document.getElementById('carreta2').value = r.carreta2;
-      
-      // Apenas a hora de chegada é preenchida no input
       document.getElementById('hChegada').value = r.hChegada; 
       document.getElementById('hSaida').value = r.hSaida;
       document.getElementById('motChegada').value = r.motChegada;
@@ -208,25 +220,36 @@
     }
 
     function salvarRegistro() {
-      const hChegada = document.getElementById('hChegada').value;
+      const hChegada = document.getElementById('hChegada').value.trim();
+      const hSaida = document.getElementById('hSaida').value.trim();
       
-      if (!hChegada) {
-        alert("A 'H. Chegada' é obrigatória.");
+      // Validação: Pelo menos um dos campos de hora deve ser preenchido
+      if (!hChegada && !hSaida) {
+        alert("Pelo menos 'H. Chegada' ou 'H. Saída' deve ser preenchido.");
         return;
       }
 
-      // Cria um objeto Date para o timestamp usando a data atual e a hora informada
-      const now = new Date();
-      const [hours, minutes] = hChegada.split(':').map(Number);
-      now.setHours(hours, minutes, 0, 0); // Define a hora e minuto, zera segundos e milissegundos
+      // Define o timestamp para ordenação: prioriza hSaida, senão usa hChegada
+      let ordemTimestamp = null;
+      if (hSaida) {
+          ordemTimestamp = criarTimestampHojeComHora(hSaida);
+      } else if (hChegada) { // Se hSaida estiver vazia, usa hChegada
+          ordemTimestamp = criarTimestampHojeComHora(hChegada);
+      }
+
+      if (!ordemTimestamp) { // Caso raro, mas para garantir que o timestamp seja gerado
+          alert("Não foi possível determinar um horário válido para ordenação. Verifique as horas.");
+          return;
+      }
 
       const novo = {
         cavalo: document.getElementById('cavalo').value.trim(),
         carreta1: document.getElementById('carreta1').value.trim(),
         carreta2: document.getElementById('carreta2').value.trim(),
-        timestamp: now.getTime(), // Adiciona o timestamp da data e hora atual + hora informada
-        hChegada: hChegada, // Mantém a hora de chegada separada
-        hSaida: document.getElementById('hSaida').value,
+        timestamp: new Date().getTime(), // Timestamp da criação/última edição (data atual + hora atual)
+        ordemTimestamp: ordemTimestamp, // Timestamp para ordenação (data atual + hChegada ou hSaida)
+        hChegada: hChegada,
+        hSaida: hSaida,
         motChegada: document.getElementById('motChegada').value.trim(),
         motSaida: document.getElementById('motSaida').value.trim(),
         origem: document.getElementById('origem').value.trim(),
@@ -245,25 +268,36 @@
         return;
       }
 
-      const hChegada = document.getElementById('hChegada').value;
+      const hChegada = document.getElementById('hChegada').value.trim();
+      const hSaida = document.getElementById('hSaida').value.trim();
 
-      if (!hChegada) {
-        alert("A 'H. Chegada' é obrigatória para edição.");
+      // Validação: Pelo menos um dos campos de hora deve ser preenchido
+      if (!hChegada && !hSaida) {
+        alert("Pelo menos 'H. Chegada' ou 'H. Saída' deve ser preenchido para edição.");
         return;
       }
 
-      // Ao editar, atualizamos o timestamp com a data atual e a hora de chegada informada
-      const now = new Date();
-      const [hours, minutes] = hChegada.split(':').map(Number);
-      now.setHours(hours, minutes, 0, 0);
+      // Define o timestamp para ordenação: prioriza hSaida, senão usa hChegada
+      let ordemTimestamp = null;
+      if (hSaida) {
+          ordemTimestamp = criarTimestampHojeComHora(hSaida);
+      } else if (hChegada) { // Se hSaida estiver vazia, usa hChegada
+          ordemTimestamp = criarTimestampHojeComHora(hChegada);
+      }
+      
+      if (!ordemTimestamp) { // Caso raro, mas para garantir que o timestamp seja gerado
+          alert("Não foi possível determinar um horário válido para ordenação. Verifique as horas.");
+          return;
+      }
 
       registros[registroSelecionadoIndex] = {
         cavalo: document.getElementById('cavalo').value.trim(),
         carreta1: document.getElementById('carreta1').value.trim(),
         carreta2: document.getElementById('carreta2').value.trim(),
-        timestamp: now.getTime(), // Atualiza o timestamp
-        hChegada: hChegada, // Mantém a hora de chegada separada
-        hSaida: document.getElementById('hSaida').value,
+        timestamp: new Date().getTime(), // Atualiza o timestamp da última edição (data atual + hora atual)
+        ordemTimestamp: ordemTimestamp, // Atualiza o timestamp para ordenação
+        hChegada: hChegada,
+        hSaida: hSaida,
         motChegada: document.getElementById('motChegada').value.trim(),
         motSaida: document.getElementById('motSaida').value.trim(),
         origem: document.getElementById('origem').value.trim(),
@@ -282,18 +316,16 @@
       }
 
       if (confirm(`Deseja excluir ${checkboxes.length} registro(s) selecionado(s)?`)) {
-        // Coleta os índices dos itens a serem excluídos em ordem decrescente
-        // para evitar problemas com a mudança de índices durante a exclusão
         const indicesParaExcluir = Array.from(checkboxes)
           .map(cb => parseInt(cb.dataset.index))
-          .sort((a, b) => b - a); // Ordena do maior para o menor
+          .sort((a, b) => b - a); // Ordena do maior para o menor para evitar problemas
 
         indicesParaExcluir.forEach(index => {
           registros.splice(index, 1);
         });
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(registros));
-        limparCampos(false); // Limpa os campos, sem perguntar, após exclusão
+        limparCampos(false);
         atualizarTerminal();
       }
     }
@@ -304,7 +336,7 @@
       }
       document.querySelectorAll('.input-row input').forEach(i => i.value = '');
       registroSelecionadoIndex = null;
-      document.getElementById('selecionarTodos').checked = false; // Desmarca o checkbox "selecionar todos"
+      document.getElementById('selecionarTodos').checked = false;
       atualizarTerminal();
     }
 
