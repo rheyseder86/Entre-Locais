@@ -81,8 +81,7 @@
             <th>Cavalo</th>
             <th>Carreta 01</th>
             <th>Carreta 02</th>
-            <th>Data Cheg.</th>
-            <th>H. Chegada</th>
+            <th>Data/H. Chegada</th>
             <th>H. Saída</th>
             <th>Mot. Chegada</th>
             <th>Mot. Saída</th>
@@ -98,7 +97,6 @@
       <div class="col"><input type="text" id="cavalo" class="form-control form-control-sm" placeholder="Cavalo"></div>
       <div class="col"><input type="text" id="carreta1" class="form-control form-control-sm" placeholder="Carreta 01"></div>
       <div class="col"><input type="text" id="carreta2" class="form-control form-control-sm" placeholder="Carreta 02"></div>
-      <div class="col"><input type="date" id="dChegada" class="form-control form-control-sm" placeholder="Data Chegada"></div>
       <div class="col"><input type="time" id="hChegada" class="form-control form-control-sm" placeholder="H. Chegada"></div>
       <div class="col"><input type="time" id="hSaida" class="form-control form-control-sm" placeholder="H. Saída"></div>
       <div class="col"><input type="text" id="motChegada" class="form-control form-control-sm" placeholder="Mot. Chegada"></div>
@@ -129,17 +127,17 @@
   <script>
     const STORAGE_KEY = 'chegadas_rte700';
     let registros = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    let registroSelecionadoIndex = null; // Agora armazena apenas o índice para edição
+    let registroSelecionadoIndex = null; // Armazena apenas o índice para edição
 
     function formatarDataHoraParaExibicao(timestamp) {
-      if (!timestamp) return { data: '', hora: '' };
+      if (!timestamp) return ''; // Retorna vazio se não houver timestamp
       const date = new Date(timestamp);
       const dia = String(date.getDate()).padStart(2, '0');
       const mes = String(date.getMonth() + 1).padStart(2, '0');
       const ano = date.getFullYear();
       const hora = String(date.getHours()).padStart(2, '0');
       const minuto = String(date.getMinutes()).padStart(2, '0');
-      return { data: `${dia}/${mes}/${ano}`, hora: `${hora}:${minuto}` };
+      return `${dia}/${mes}/${ano} ${hora}:${minuto}`;
     }
 
     function atualizarTerminal() {
@@ -158,8 +156,8 @@
         )
         .map((r, i) => {
           // Precisamos encontrar o índice original para o checkbox e seleção
-          const originalIndex = registros.findIndex(reg => reg.timestamp === r.timestamp);
-          const { data: dChegadaExibicao, hora: hChegadaExibicao } = formatarDataHoraParaExibicao(r.timestamp);
+          const originalIndex = registros.findIndex(reg => reg.timestamp === r.timestamp && reg.cavalo === r.cavalo); // Mais robusto para encontrar o original
+          const dataHoraChegadaExibicao = formatarDataHoraParaExibicao(r.timestamp);
 
           return `
             <tr class="${registroSelecionadoIndex === originalIndex ? 'linha-selecionada' : ''}">
@@ -170,8 +168,7 @@
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.cavalo}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.carreta1}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.carreta2}</td>
-              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${dChegadaExibicao}</td>
-              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${hChegadaExibicao}</td>
+              <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${dataHoraChegadaExibicao}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.hSaida}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.motChegada}</td>
               <td onclick="selecionarRegistro(${originalIndex})" style="cursor:pointer;">${r.motSaida}</td>
@@ -201,21 +198,8 @@
       document.getElementById('carreta1').value = r.carreta1;
       document.getElementById('carreta2').value = r.carreta2;
       
-      // Ajusta a data e hora para os campos input[type="date"] e input[type="time"]
-      if (r.timestamp) {
-        const date = new Date(r.timestamp);
-        const dia = String(date.getDate()).padStart(2, '0');
-        const mes = String(date.getMonth() + 1).padStart(2, '0');
-        const ano = date.getFullYear();
-        const hora = String(date.getHours()).padStart(2, '0');
-        const minuto = String(date.getMinutes()).padStart(2, '0');
-        document.getElementById('dChegada').value = `${ano}-${mes}-${dia}`;
-        document.getElementById('hChegada').value = `${hora}:${minuto}`;
-      } else {
-        document.getElementById('dChegada').value = '';
-        document.getElementById('hChegada').value = '';
-      }
-
+      // A hora de chegada é preenchida, mas a data será a do momento da edição/salvamento
+      document.getElementById('hChegada').value = r.hChegada; 
       document.getElementById('hSaida').value = r.hSaida;
       document.getElementById('motChegada').value = r.motChegada;
       document.getElementById('motSaida').value = r.motSaida;
@@ -226,23 +210,24 @@
     }
 
     function salvarRegistro() {
-      const dChegada = document.getElementById('dChegada').value;
       const hChegada = document.getElementById('hChegada').value;
       
-      if (!dChegada || !hChegada) {
-        alert("A 'Data Chegada' e a 'H. Chegada' são obrigatórias.");
+      if (!hChegada) {
+        alert("A 'H. Chegada' é obrigatória.");
         return;
       }
 
-      // Cria um objeto Date para o timestamp
-      const timestampString = `${dChegada}T${hChegada}`; // Formato ISO 8601
-      const timestamp = new Date(timestampString).getTime();
+      // Cria um objeto Date para o timestamp usando a data atual e a hora informada
+      const now = new Date();
+      const [hours, minutes] = hChegada.split(':').map(Number);
+      now.setHours(hours, minutes, 0, 0); // Define a hora e minuto, zera segundos e milissegundos
 
       const novo = {
         cavalo: document.getElementById('cavalo').value.trim(),
         carreta1: document.getElementById('carreta1').value.trim(),
         carreta2: document.getElementById('carreta2').value.trim(),
-        timestamp: timestamp, // Adiciona o timestamp
+        timestamp: now.getTime(), // Adiciona o timestamp da data e hora atual + hora informada
+        hChegada: hChegada, // Mantém a hora de chegada separada para edição
         hSaida: document.getElementById('hSaida').value,
         motChegada: document.getElementById('motChegada').value.trim(),
         motSaida: document.getElementById('motSaida').value.trim(),
@@ -262,22 +247,24 @@
         return;
       }
 
-      const dChegada = document.getElementById('dChegada').value;
       const hChegada = document.getElementById('hChegada').value;
 
-      if (!dChegada || !hChegada) {
-        alert("A 'Data Chegada' e a 'H. Chegada' são obrigatórias para edição.");
+      if (!hChegada) {
+        alert("A 'H. Chegada' é obrigatória para edição.");
         return;
       }
 
-      const timestampString = `${dChegada}T${hChegada}`;
-      const timestamp = new Date(timestampString).getTime();
+      // Ao editar, atualizamos o timestamp com a data atual e a hora de chegada informada
+      const now = new Date();
+      const [hours, minutes] = hChegada.split(':').map(Number);
+      now.setHours(hours, minutes, 0, 0);
 
       registros[registroSelecionadoIndex] = {
         cavalo: document.getElementById('cavalo').value.trim(),
         carreta1: document.getElementById('carreta1').value.trim(),
         carreta2: document.getElementById('carreta2').value.trim(),
-        timestamp: timestamp, // Atualiza o timestamp
+        timestamp: now.getTime(), // Atualiza o timestamp
+        hChegada: hChegada, // Mantém a hora de chegada separada para edição
         hSaida: document.getElementById('hSaida').value,
         motChegada: document.getElementById('motChegada').value.trim(),
         motSaida: document.getElementById('motSaida').value.trim(),
@@ -332,8 +319,8 @@
 
     function emitirTXT() {
       const texto = registros.map((r, i) => {
-        const { data: dChegadaExibicao, hora: hChegadaExibicao } = formatarDataHoraParaExibicao(r.timestamp);
-        return `#${i + 1} ${r.cavalo} ${r.carreta1} ${r.carreta2} ${dChegadaExibicao} ${hChegadaExibicao} ${r.hSaida} ${r.motChegada} ${r.motSaida} ${r.origem} ${r.destino}`;
+        const dataHoraChegadaExibicao = formatarDataHoraParaExibicao(r.timestamp);
+        return `#${i + 1} ${r.cavalo} ${r.carreta1} ${r.carreta2} ${dataHoraChegadaExibicao} ${r.hSaida} ${r.motChegada} ${r.motSaida} ${r.origem} ${r.destino}`;
       }).join('\n');
 
       const blob = new Blob([texto], { type: 'text/plain' });
@@ -347,18 +334,17 @@
 
     function emitirExcel() {
       const headers = [
-        "Cavalo", "Carreta 01", "Carreta 02", "Data Chegada", "Hora Chegada", 
+        "Cavalo", "Carreta 01", "Carreta 02", "Data/Hora Chegada", 
         "Hora Saída", "Mot. Chegada", "Mot. Saída", "Origem", "Destino"
       ];
       
       const dadosParaExcel = registros.map(r => {
-        const { data: dChegadaExibicao, hora: hChegadaExibicao } = formatarDataHoraParaExibicao(r.timestamp);
+        const dataHoraChegadaExibicao = formatarDataHoraParaExibicao(r.timestamp);
         return {
           "Cavalo": r.cavalo,
           "Carreta 01": r.carreta1,
           "Carreta 02": r.carreta2,
-          "Data Chegada": dChegadaExibicao,
-          "Hora Chegada": hChegadaExibicao,
+          "Data/Hora Chegada": dataHoraChegadaExibicao,
           "Hora Saída": r.hSaida,
           "Mot. Chegada": r.motChegada,
           "Mot. Saída": r.motSaida,
